@@ -1,29 +1,64 @@
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+from collections import defaultdict
+from rich import print
+from keybert import KeyBERT
+import spacy
+import time
 
-try:
-    # Load model and tokenizer
-    model_name = "google/t5-efficient-tiny"
-    model = T5ForConditionalGeneration.from_pretrained(model_name)
-    tokenizer = T5Tokenizer.from_pretrained(model_name)
+'''
+This class provides a simple text summarization functionality using the KeyBERT library.
+It returns the top keywords and sentences based on the weighted presence of keywords (which is a brief summary).
+'''
 
-    print("Model and tokenizer loaded successfully")
+class TextSummarizer:
+    def __init__(self):
+        self.nlp = spacy.load('en_core_web_sm')
+        self.nlp.add_pipe('sentencizer')
+        self.kw_model = KeyBERT()
 
-    # Prepare input text for summarization
-    input_text = "summarize: Wormholes, hypothetical topological features of spacetime, have long captivated the imagination of scientists and science fiction enthusiasts alike. These theoretical tunnels through space and time offer the tantalizing possibility of shortcuts across the universe, potentially allowing for faster-than-light travel. First conceptualized in 1935 by Einstein and Rosen, wormholes emerge from solutions to the equations of general relativity. While mathematically possible, the existence of traversable wormholes faces significant challenges. They would require exotic matter with negative energy density to remain open and stable, a concept that pushes the boundaries of known physics. If they exist, wormholes could connect distant regions of space-time, even linking different universes or timelines. This property has led to speculation about their potential for time travel, though the paradoxes this might create remain unresolved. Despite their theoretical intrigue, no observational evidence for wormholes has been found. Current research focuses on refining mathematical models and exploring potential detection methods. As our understanding of quantum gravity and the nature of spacetime evolves, wormholes continue to serve as a fascinating intersection of theoretical physics, cosmology, and our quest to unravel the universe's deepest mysteries."
+    def summarize(self, input_text: int, summary_percent=0.2, verbose=False) -> tuple:
+        start = time.perf_counter()
 
-    input_tokens = tokenizer.encode(input_text, return_tensors="pt")
+        # Extract keywords with their scores
+        raw_keywords = self.kw_model.extract_keywords(input_text, keyphrase_ngram_range=(1, 1), top_n=10)
+        keyword_scores = {kw[0]: kw[1] for kw in raw_keywords}
 
-    print("Input tokenized, generating output...")
+        # Tokenize the text into sentences
+        doc = self.nlp(input_text)
+        sentences = [sent.text for sent in doc.sents]
 
-    # Generate output
-    output_tokens = model.generate(input_tokens, max_new_tokens=100, num_beams=4, length_penalty=2.0, early_stopping=True)
+        # Score sentences based on the weighted presence of keywords
+        sentence_scores = defaultdict(int)
+        for sentence in sentences:
+            sentence = sentence.lower()
+            for keyword, score in keyword_scores.items():
+                sentence_scores[sentence] += sentence.count(keyword) * score
 
-    # Decode and print the output
-    output_text = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
-    print("Generated output (raw):")
-    print(output_tokens)
-    print("Generated output (decoded):")
-    print(output_text)
-    print("Output length:", len(output_text))
-except Exception as e:
-    print(f"An error occurred: {e}")
+        # Select top sentences based on their scores
+        num_sentences = max(int(len(sentences) * summary_percent), 1)  # Ensure at least one sentence is selected
+        top_sentences = sorted(sentence_scores, key=sentence_scores.get, reverse=True)[:num_sentences]
+
+        top_keywords = list(keyword_scores.keys())
+
+        # Output
+        if verbose:
+            print('Input Text:', input_text)
+            print('Keywords:', top_keywords)
+            print('Top Sentences:', top_sentences)
+            print('Time taken:', (time.perf_counter() - start), 'seconds')
+
+        return top_keywords, top_sentences
+
+    def mass_summarize(self, input_texts: list, summary_percent=0.2) -> list:
+        summaries = []
+        for text in input_texts:
+            summaries.append(self.summarize(text, summary_percent))
+        return summaries
+
+# Example usage
+if __name__ == "__main__":
+    summarizer = TextSummarizer()
+    input_file = 'inp.txt'
+    with open(input_file, 'r') as file:
+        input_text = file.read()
+    print('Input Text:', input_text)
+    print('Summary:', summarizer.summarize(input_text))
