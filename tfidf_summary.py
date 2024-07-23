@@ -9,15 +9,20 @@ import re
 Extract keywords from the text with tf-idf vectorization.
 '''
 def tfidf_summarize(text: str) -> List[str]:
-    text_cleaned = re.sub(r"[^\w\s]", "", text).lower()
-    vectorizer = TfidfVectorizer(stop_words='english', max_features=1000)
-    vectorizer.fit([text_cleaned])  # Fitting on the single cleaned line
-    
-    tfidf_matrix = vectorizer.transform([text_cleaned])
-    feature_array = vectorizer.get_feature_names_out()
-    tfidf_sorting = tfidf_matrix.toarray().flatten().argsort()[-5:][::-1]
-    key_phrases = feature_array[tfidf_sorting]
-    return key_phrases
+    try:
+        text_cleaned = re.sub(r"[^\w\s]", "", text).lower()
+        vectorizer = TfidfVectorizer(stop_words='english', max_features=1000)
+        vectorizer.fit([text_cleaned])
+
+        # print('Text cleaned:', text_cleaned)
+
+        tfidf_matrix = vectorizer.transform([text_cleaned])
+        feature_array = vectorizer.get_feature_names_out()
+        tfidf_sorting = tfidf_matrix.toarray().flatten().argsort()[-5:][::-1]
+        key_phrases = feature_array[tfidf_sorting]
+        return key_phrases
+    except ValueError:
+        return []
 
 def main():
     LOG_RATE = 10000 # Log every 10k rows

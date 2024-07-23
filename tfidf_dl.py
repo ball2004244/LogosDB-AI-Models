@@ -1,114 +1,115 @@
+# Train a new DeepLearning model based on TF-IDF modelling.
+
+# First, generate train data using TF-IDF vectorizer
+# train.csv format: RawText, Keywords
+# e.g: 
+# RawText: "Wormholes, hypothetical topological features of spacetime, have long captivated the imagination of scientists and science fiction enthusiasts alike. These theoretical tunnels through space and time offer the tantalizing possibility of shortcuts across the universe, potentially allowing for faster-than-light travel. First conceptualized in 1935 by Einstein and Rosen, wormholes emerge from solutions to the equations of general relativity. While mathematically possible, the existence of traversable wormholes faces significant challenges. They would require exotic matter with negative energy density to remain open and stable, a concept that pushes the boundaries of known physics. If they exist, wormholes could connect distant regions of space-time, even linking different universes or timelines. This property has led to speculation about their potential for time travel, though the paradoxes this might create remain unresolved. Despite their theoretical intrigue, no observational evidence for wormholes has been found. Current research focuses on refining mathematical models and exploring potential detection methods. As our understanding of quantum gravity and the nature of spacetime evolves, wormholes continue to serve as a fascinating intersection of theoretical physics, cosmology, and our quest to unravel the universe's deepest mysteries.",
+# Keywords: "wormholes, spacetime, theoretical physics, general relativity
+
+# Then, train the model using the generated data
+
+# Finally, save the model to a file
+
+from typing import Tuple
+from tfidf_summary import tfidf_summarize
+import multiprocessing as mp
+import functools
 import time
-import torch
-import torch.nn as nn
-import torch.optim as optim
+
 import pandas as pd
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.feature_extraction.text import TfidfVectorizer
-'''
-Train a deep learning model to reconstruct the TF-IDF vectors.
-This model can process multiple documents at once, instead of one by one.
-'''
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+import numpy as np
 
-print(f'Using device: {device}')
+# Read the raw data
+def read_raw_data(filename: str) -> pd.DataFrame:
+    return pd.read_csv(filename)
 
-# Example text data and labels
-print('Reading input file...')
-start = time.perf_counter()
-#* Read from a text file
-# texts = []
-# with open('temp.txt', 'r') as file:
-#     texts = file.readlines()
+def tfidf_summarize_helper(text: str) -> str:
+    return ', '.join(tfidf_summarize(text))
 
-#* Read from a CSV file
-df = pd.read_csv('single_qna.csv')[['Question', 'Answer']]
-df.fillna('', inplace=True)
-texts = df['Question'] + ' ' + df['Answer']
-print(f'Reading input file took {time.perf_counter() - start:.2f} seconds')
-
-
-# Generate TF-IDF vectors
-print('Generating TF-IDF vectors...')
-start = time.perf_counter()
-vectorizer = TfidfVectorizer(max_features=1000)  # Adjust max_features as needed
-X = vectorizer.fit_transform(texts).toarray()
-print(f'Generating TF-IDF vectors took {time.perf_counter() - start:.2f} seconds')
-
-# Convert arrays to PyTorch tensors and move to the specified device
-print('Converting to PyTorch tensors & moving to device...')
-start = time.perf_counter()
-X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
-print(f'Conversion took {time.perf_counter() - start:.2f} seconds')
-class AdvancedTFIDFModel(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(AdvancedTFIDFModel, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 512)  # Reduced from 1024 to 512
-        self.dropout1 = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(512, 256)  # Reduced from 512 to 256
-        self.dropout2 = nn.Dropout(0.5)
-        self.fc3 = nn.Linear(256, output_dim)
+def build_train_data(df: pd.DataFrame, filename: str) -> None:
+    '''
+    Build data with TF-IDF vectorizer
+    '''
     
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = self.dropout1(x)
-        x = torch.relu(self.fc2(x))
-        x = self.dropout2(x)
-        x = self.fc3(x)
-        return x
+    # first concat the Question and Answer columns to form a new column named 'RawText'
+    df['RawText'] = df['Question'] + ' ' + df['Answer']
+    
+    # now drop all empty str or NaN values
+    for col in df.columns:
+        df = df[df[col].notna()]
+        df = df[df[col] != '']
+    df.reset_index(drop=True, inplace=True)
+    
+    # Use multiprocessing to apply tfidf_summarize
+    with mp.Pool() as pool:
+        df['Keywords'] = pool.map(tfidf_summarize_helper, df['RawText'])
+        
+    df.dropna(inplace=True)
+    df.reset_index(drop=True, inplace=True)
 
-def train_model(model: nn.Module, X: torch.Tensor, epochs: int, batch_size: int = 32) -> nn.Module:
-    # Create a TensorDataset and DataLoader
-    dataset = TensorDataset(X, X)  # Using X as both input and target since it's an autoencoder
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    # save the data to a new file
+    df.to_csv(filename, index=False)
 
-    print('Start Training...')
+    return
+
+def split_data(df: pd.DataFrame, train_file: str, valid_file: str, test_file: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    '''
+    Split the data into train, validation, and test sets
+    '''
+    ratio = {
+        'train': 0.7,
+        'valid': 0.15,
+        'test': 0.15
+    }
+    
+    train, valid, test = np.split(
+        df.sample(frac=1, random_state=42), 
+        [int(ratio['train'] * len(df)), 
+         int((ratio['train'] + ratio['valid']) * len(df))]
+    )
+    
+    train.to_csv(train_file, index=False)
+    valid.to_csv(valid_file, index=False)
+    test.to_csv(test_file, index=False)
+
+    return train, valid, test
+
+class TFIDFDeepLearning:
+    def __init__(self):
+        pass
+
+    def train(self, train_file: str) -> None:
+        pass
+
+    def predict(self, text: str) -> str:
+        pass
+
+    
+
+def main() -> None:
+    raw_file = 'single_qna.csv'
+    processed_file = 'processed_qna.csv'
+    train_file = 'train.csv'
+    valid_file = 'valid.csv'
+    test_file = 'test.csv'
+
     start = time.perf_counter()
-    for epoch in range(epochs):
-        for inputs, targets in dataloader:
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optimizer.step()
-        print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
-    print(f'Time taken: {time.perf_counter() - start:.2f} seconds')
-    print('Finished Training')
-    return model
+    print('Preprocessing data with multiprocessing...')
+    df = read_raw_data(raw_file)[['Question', 'Answer']]
+    build_train_data(df, processed_file)
+    print('Preprocessing done!, Time taken:', time.perf_counter() - start)
 
-# Take roughly 1252s ~ 20 minutes for this config
-model = AdvancedTFIDFModel(input_dim=X.shape[1], output_dim=X.shape[1]).to(device)
-# Loss and optimizer
-criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-EPOCHS = 100
-BATCH_SIZE = 64
+    print('Preparing train, validation, and test sets...')
+    t_start = time.perf_counter()
+    df = read_raw_data(processed_file)
+    split_data(df, train_file, valid_file, test_file)
+    print('Data split done!, Time taken:', time.perf_counter() - t_start)
 
-model = train_model(model, X_tensor, EPOCHS, BATCH_SIZE)
+    print('Start training...')
+    t_start = time.perf_counter()
+    
+    print('Finished training!, Time taken:', time.perf_counter() - t_start)
+    return
 
-# Save the model
-model_file = 'tfidf_model.pth'
-torch.save(model.state_dict(), model_file)
-print(f'Model saved to {model_file}')
-
-# Inference
-print('Starting Inference...')
-start = time.perf_counter()
-with open('temp.txt', 'r') as file:
-    inf_texts = file.readlines()
-
-inf_X = vectorizer.transform(inf_texts).toarray()
-inf_X_tensor = torch.tensor(inf_X, dtype=torch.float32).to(device)
-
-feature_names = vectorizer.get_feature_names_out()
-with torch.no_grad():
-    inf_reconstructed = model(inf_X_tensor)
-    inf_thresholded_outputs = torch.where(inf_reconstructed > 0.1, inf_reconstructed, torch.tensor(0.0).to(device))
-    inf_top_keywords_per_doc = torch.topk(inf_thresholded_outputs, 5).indices.cpu().numpy()
-
-inf_top_keywords = feature_names[inf_top_keywords_per_doc]
-print("Top 5 keywords per document:")
-for i, keywords in enumerate(inf_top_keywords):
-    print(f"Document {i+1}: {keywords}")
-
-print(f'Inference took {time.perf_counter() - start:.2f} seconds')
+if __name__ == '__main__':
+    main()
