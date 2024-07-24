@@ -40,7 +40,7 @@ def test_inference(batch_size=32):
 
     print('Running inference on test data...')
     for start_idx in range(0, num_samples, batch_size):
-        print(f'Test on batch {start_idx // batch_size + 1}/{num_samples // batch_size}')
+        print(f'Test on batch {start_idx // batch_size}/{num_samples // batch_size}')
 
         end_idx = min(start_idx + batch_size, num_samples)
         batch_raw_texts = raw_texts[start_idx:end_idx]
@@ -48,7 +48,7 @@ def test_inference(batch_size=32):
         batch_predicted_keywords = infer(
             model, vectorizer, mlb, batch_raw_texts)
         all_predicted_keywords.extend(batch_predicted_keywords)
-        print(f'Finished testing on batch {start_idx // batch_size + 1}/{num_samples // batch_size}')
+        print(f'Finished testing on batch {start_idx // batch_size}/{num_samples // batch_size}')
 
     print(f'Finished test inference, Time taken: {time.perf_counter() - start:.2f} seconds')
 
