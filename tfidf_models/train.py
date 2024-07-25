@@ -93,8 +93,8 @@ def train_model(model, train_loader, criterion, optimizer, num_epochs):
 
 
 def start_training():
-    BATCH_SIZE = 128
-    EPOCHS = 100
+    BATCH_SIZE = 512
+    EPOCHS = 20
     CHUNK_SIZE = 2**15 # 32k
     train_file = 'train.csv'
     valid_file = 'valid.csv'
@@ -180,19 +180,25 @@ def start_training():
 
     valid_predictions = make_predictions(model, valid_loader)
     test_predictions = make_predictions(model, test_loader)
+    
+    # save the predictions for later use
+    print('Saving predictions for later use...')
+    valid_predictions_file = 'valid_predictions.pkl'
+    test_predictions_file = 'test_predictions.pkl'
+    joblib.dump(valid_predictions, valid_predictions_file)
+    joblib.dump(test_predictions, test_predictions_file)
 
-    valid_accuracy = find_accuracy(valid_predictions, valid_data['Keywords'])
-    test_accuracy = find_accuracy(test_predictions, test_data['Keywords'])
+
+    print('Calculating accuracy...')
+    valid_accuracy = find_accuracy(model, valid_loader)
+    test_accuracy = find_accuracy(model, test_loader)
 
     print(
         f'Validation accuracy: {valid_accuracy:.2f} ~ {valid_accuracy * 100:.2f}%')
     print(f'Test accuracy: {test_accuracy:.2f} ~ {test_accuracy * 100:.2f}%')
 
-# Define the prediction function
-
 
 def make_predictions(model, data_loader):
-    model.eval()
     predictions = []
     with torch.no_grad():
         for data in data_loader:
@@ -203,32 +209,17 @@ def make_predictions(model, data_loader):
             predictions.extend(predicted.cpu().numpy())
     return predictions
 
-# Define the accuracy function
-
-
-def find_accuracy(predicted_keywords, expected_keywords):
-    total_correct = 0
-    total_keywords = 0
-
-    for pred_keywords, exp_keywords in zip(predicted_keywords, expected_keywords):
-        pred_set = set(pred_keywords)
-        exp_set = set(exp_keywords)
-
-        # Calculate the intersection of predicted and expected keywords
-        intersection = pred_set.intersection(exp_set)
-
-        # Count the number of correct predictions
-        total_correct += len(intersection)
-        # Count the total number of expected keywords
-        total_keywords += len(exp_set)
-
-    # Calculate total accuracy
-    if total_keywords > 0:
-        accuracy = total_correct / total_keywords
-    else:
-        accuracy = 0
-
-    return accuracy
+def find_accuracy(model, data_loader):
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for data in data_loader:
+            inputs, labels = data  # Assuming data_loader returns a tuple (inputs, labels)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+    return correct / total
 
 
 if __name__ == '__main__':
