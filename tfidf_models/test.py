@@ -77,8 +77,11 @@ def find_accuracy(predicted_keywords, expected_keywords):
         accuracy = total_correct / total_keywords
     else:
         accuracy = 0
+        
+    with open('accuracy.txt', 'w') as file:
+        file.write(str(accuracy))
 
     return accuracy
 if __name__ == "__main__":
-    BATCH_SIZE = 1024
+    BATCH_SIZE = 32
     test_inference(batch_size=BATCH_SIZE)

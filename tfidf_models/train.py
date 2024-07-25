@@ -85,14 +85,16 @@ def train_model(model, train_loader, criterion, optimizer, num_epochs):
             optimizer.step()
 
 def start_training():
-    BATCH_SIZE = 32
-    EPOCHS = 10
+    BATCH_SIZE = 1024
+    EPOCHS = 100
     CHUNK_SIZE = 100000
     train_file = 'train.csv'
     valid_file = 'valid.csv'
     test_file = 'test.csv'
     model_file = 'model.pth'
 
+    print('CONFIGURATION:')
+    print(f'BATCH_SIZE: {BATCH_SIZE}\nEPOCHS: {EPOCHS}\nCHUNK_SIZE: {CHUNK_SIZE}')
     start = time.perf_counter()
     print('Reading training data...')
     df_iter = pd.read_csv(train_file, chunksize=CHUNK_SIZE)
@@ -142,6 +144,69 @@ def start_training():
     torch.save(model.state_dict(), model_file)
     print(f'Final model saved to {model_file}')
     print(f'Training completed!, Time taken: {time.perf_counter() - start:.2f} seconds')
+    
+    # Now we can use the trained model for validate and test
+    valid_data = pd.read_csv(valid_file)
+    test_data = pd.read_csv(test_file)
+    
+    # Preprocess validation and test data
+    X_valid, y_valid, _, _ = preprocess_data(valid_data, vectorizer, mlb)
+    X_test, y_test, _, _ = preprocess_data(test_data, vectorizer, mlb)
+    
+    valid_dataset = TextDataset(X_valid, y_valid)
+    test_dataset = TextDataset(X_test, y_test)
+    
+    valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    
+    # Evaluate the model on validation and test data
+    model.eval()
+    
+    valid_predictions = make_predictions(model, valid_loader)
+    test_predictions = make_predictions(model, test_loader)
+    
+    valid_accuracy = find_accuracy(valid_predictions, valid_data['Keywords'])
+    test_accuracy = find_accuracy(test_predictions, test_data['Keywords'])
+    
+    print(f'Validation accuracy: {valid_accuracy:.2f} ~ {valid_accuracy * 100:.2f}%')
+    print(f'Test accuracy: {test_accuracy:.2f} ~ {test_accuracy * 100:.2f}%')
+    
+# Define the prediction function
+def make_predictions(model, data_loader):
+    model.eval()
+    predictions = []
+    with torch.no_grad():
+        for data in data_loader:
+            inputs = data['RawText']  # Adjust this line based on your dataset structure
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs, 1)
+            predictions.append(predicted.cpu().numpy())
+    return predictions
+
+# Define the accuracy function
+def find_accuracy(predicted_keywords, expected_keywords):
+    total_correct = 0
+    total_keywords = 0
+
+    for pred_keywords, exp_keywords in zip(predicted_keywords, expected_keywords):
+        pred_set = set(pred_keywords)
+        exp_set = set(exp_keywords)
+
+        # Calculate the intersection of predicted and expected keywords
+        intersection = pred_set.intersection(exp_set)
+
+        # Count the number of correct predictions
+        total_correct += len(intersection)
+        # Count the total number of expected keywords
+        total_keywords += len(exp_set)
+
+    # Calculate total accuracy
+    if total_keywords > 0:
+        accuracy = total_correct / total_keywords
+    else:
+        accuracy = 0
+        
+    return accuracy
 
 if __name__ == '__main__':
     start_training()
