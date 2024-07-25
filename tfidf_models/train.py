@@ -76,8 +76,7 @@ class TextDataset(Dataset):
         return torch.tensor(text, dtype=torch.float32), torch.tensor(label, dtype=torch.float32)
 
 
-def train_model(model, train_loader, criterion, optimizer, num_epochs):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+def train_model(model, train_loader, criterion, optimizer, num_epochs, device=torch.device('cpu')):
     model.to(device)
 
     model.train()
@@ -93,13 +92,14 @@ def train_model(model, train_loader, criterion, optimizer, num_epochs):
 
 
 def start_training():
-    BATCH_SIZE = 512
+    BATCH_SIZE = 1024
     EPOCHS = 20
-    CHUNK_SIZE = 2**15 # 32k
+    CHUNK_SIZE = 2**15  # 32k
     train_file = 'train.csv'
     valid_file = 'valid.csv'
     test_file = 'test.csv'
     model_file = 'model.pth'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print('CONFIGURATION:')
     print(
@@ -149,7 +149,7 @@ def start_training():
 
         print('Training model...')
         train_model(model, train_loader, criterion,
-                    optimizer, num_epochs=EPOCHS)
+                    optimizer, num_epochs=EPOCHS, device=device)
         print(f'Finished training chunk {i + 1}/{total_chunks}')
 
     print('Saving final model...')
@@ -178,16 +178,15 @@ def start_training():
     # Evaluate the model on validation and test data
     model.eval()
 
-    valid_predictions = make_predictions(model, valid_loader)
-    test_predictions = make_predictions(model, test_loader)
-    
+    valid_predictions = make_predictions(model, valid_loader, device)
+    test_predictions = make_predictions(model, test_loader, device)
+
     # save the predictions for later use
     print('Saving predictions for later use...')
     valid_predictions_file = 'valid_predictions.pkl'
     test_predictions_file = 'test_predictions.pkl'
     joblib.dump(valid_predictions, valid_predictions_file)
     joblib.dump(test_predictions, test_predictions_file)
-
 
     print('Calculating accuracy...')
     valid_accuracy = find_accuracy(model, valid_loader)
@@ -198,23 +197,28 @@ def start_training():
     print(f'Test accuracy: {test_accuracy:.2f} ~ {test_accuracy * 100:.2f}%')
 
 
-def make_predictions(model, data_loader):
+def make_predictions(model, data_loader, device=torch.device('cpu')):
     predictions = []
     with torch.no_grad():
         for data in data_loader:
             # Assuming data_loader returns a tuple (inputs, labels)
             inputs, _ = data
+            inputs = inputs.to(device)
             outputs = model(inputs)
             _, predicted = torch.max(outputs, 1)
             predictions.extend(predicted.cpu().numpy())
     return predictions
 
-def find_accuracy(model, data_loader):
+
+def find_accuracy(model, data_loader, device=torch.device('cpu')):
     correct = 0
     total = 0
     with torch.no_grad():
         for data in data_loader:
-            inputs, labels = data  # Assuming data_loader returns a tuple (inputs, labels)
+            # Assuming data_loader returns a tuple (inputs, labels)
+            inputs, labels = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
             outputs = model(inputs)
             _, predicted = torch.max(outputs, 1)
             total += labels.size(0)
