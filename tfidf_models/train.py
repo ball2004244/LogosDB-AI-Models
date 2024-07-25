@@ -92,7 +92,7 @@ def train_model(model, train_loader, criterion, optimizer, num_epochs, device=to
 
 
 def start_training():
-    BATCH_SIZE = 1024
+    BATCH_SIZE = 4096
     EPOCHS = 20
     CHUNK_SIZE = 2**15  # 32k
     train_file = 'train.csv'
@@ -189,8 +189,8 @@ def start_training():
     joblib.dump(test_predictions, test_predictions_file)
 
     print('Calculating accuracy...')
-    valid_accuracy = find_accuracy(model, valid_loader)
-    test_accuracy = find_accuracy(model, test_loader)
+    valid_accuracy = find_accuracy(model, valid_loader, device)
+    test_accuracy = find_accuracy(model, test_loader, device)
 
     print(
         f'Validation accuracy: {valid_accuracy:.2f} ~ {valid_accuracy * 100:.2f}%')
