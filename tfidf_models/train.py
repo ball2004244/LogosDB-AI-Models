@@ -1,14 +1,4 @@
-import time
-import joblib
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import MultiLabelBinarizer
-from torch.utils.data import DataLoader, Dataset
-# Train a new DeepLearning model based on TF-IDF modelling.
-
+'''
 # First, generate train data using TF-IDF vectorizer
 # train.csv format: RawText, Keywords
 # e.g:
@@ -20,12 +10,16 @@ from torch.utils.data import DataLoader, Dataset
 
 # Finally, test the model using test data
 # test.csv format: RawText, Keywords
-
-
-'''
-This file is used to train a keyword extraction model using an LSTM neural network
 '''
 
+import time
+import joblib
+import pandas as pd
+import tensorflow as tf
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.metrics import accuracy_score
 
 def preprocess_data(df, vectorizer=None, mlb=None):
     if vectorizer is None:
@@ -44,187 +38,88 @@ def preprocess_data(df, vectorizer=None, mlb=None):
 
     return X, y, vectorizer, mlb
 
+def build_model(input_dim, output_dim):
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=(input_dim,)),
+        tf.keras.layers.Dense(512, activation='relu'),
+        tf.keras.layers.Dropout(0.5),
+        tf.keras.layers.Dense(output_dim, activation='sigmoid')
+    ])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
 
-class KeywordExtractionModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(KeywordExtractionModel, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, output_dim)
-        self.sigmoid = nn.Sigmoid()  # Add sigmoid activation
+def train_model(X, y, input_dim, output_dim):
+    model = build_model(input_dim, output_dim)
+    X_sparse = tf.sparse.SparseTensor(
+        indices=np.array([X.row, X.col]).T,
+        values=X.data,
+        dense_shape=X.shape
+    )
+    y_sparse = tf.sparse.SparseTensor(
+        indices=np.array([y.row, y.col]).T,
+        values=y.data,
+        dense_shape=y.shape
+    )
+    model.fit(X_sparse, y_sparse, epochs=10, batch_size=32, validation_split=0.1)
+    return model
 
-    def forward(self, x):
-        # Add an extra dimension: (batch_size, 1, input_dim)
-        x = x.unsqueeze(1)
-        h_lstm, _ = self.lstm(x)
-        h_lstm = h_lstm[:, -1, :]  # Take the last hidden state
-        out = self.fc(h_lstm)
-        out = self.sigmoid(out)  # Apply sigmoid activation
-        return out
-
-
-class TextDataset(Dataset):
-    def __init__(self, texts, labels):
-        self.texts = texts
-        self.labels = labels
-
-    def __len__(self):
-        return self.texts.shape[0]  # Use shape[0] to get the number of samples
-
-    def __getitem__(self, idx):
-        text = self.texts[idx].toarray().squeeze()
-        label = self.labels[idx].toarray().squeeze()
-        return torch.tensor(text, dtype=torch.float32), torch.tensor(label, dtype=torch.float32)
-
-
-def train_model(model, train_loader, criterion, optimizer, num_epochs, device=torch.device('cpu')):
-    model.to(device)
-
-    model.train()
-    for epoch in range(num_epochs):
-        for texts, labels in train_loader:
-            texts, labels = texts.to(device), labels.to(device)
-            outputs = model(texts)
-            loss = criterion(outputs, labels)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
+def evaluate_model(model, X, y):
+    X_sparse = tf.sparse.SparseTensor(
+        indices=np.array([X.row, X.col]).T,
+        values=X.data,
+        dense_shape=X.shape
+    )
+    y_sparse = tf.sparse.SparseTensor(
+        indices=np.array([y.row, y.col]).T,
+        values=y.data,
+        dense_shape=y.shape
+    )
+    loss, accuracy = model.evaluate(X_sparse, y_sparse)
+    return accuracy
 
 def start_training():
-    BATCH_SIZE = 4096
-    EPOCHS = 20
-    CHUNK_SIZE = 2**15  # 32k
     train_file = 'train.csv'
     valid_file = 'valid.csv'
     test_file = 'test.csv'
-    model_file = 'model.pth'
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    print('CONFIGURATION:')
-    print(
-        f'BATCH_SIZE: {BATCH_SIZE}\nEPOCHS: {EPOCHS}\nCHUNK_SIZE: {CHUNK_SIZE}')
+    model_file = 'model.h5'
     start = time.perf_counter()
     print('Reading training data...')
-    df_iter = pd.read_csv(train_file, chunksize=CHUNK_SIZE)
 
-    vectorizer = None
-    mlb = None
-    model = None
-    criterion = nn.BCELoss()
-    optimizer = None
+    df = pd.read_csv(train_file)
+    print(f'Total number of samples: {len(df)}')
 
-    total_chunks = sum(1 for _ in pd.read_csv(
-        train_file, chunksize=CHUNK_SIZE))
+    print('Preprocessing data...')
+    X, y, vectorizer, mlb = preprocess_data(df)
 
-    for i, chunk in enumerate(df_iter):
-        print(f'Processing chunk {i + 1}/{total_chunks}...')
-
-        print('Preprocessing data...')
-        X, y, vectorizer, mlb = preprocess_data(chunk, vectorizer, mlb)
-
-        # save all dimensions, mlb and vectorizer to a file
-        dimfile = 'dims.txt'
-        vectorizer_file = 'vectorizer.pkl'
-        mlb_file = 'mlb.pkl'
-        with open(dimfile, 'w') as file:
-            file.write(f'{X.shape[1]} {128} {y.shape[1]}')
-        joblib.dump(vectorizer, vectorizer_file)
-        joblib.dump(mlb, mlb_file)
-
-        print('Creating dataset and dataloader...')
-        train_dataset = TextDataset(X, y)
-        train_loader = DataLoader(
-            train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
-        input_dim = X.shape[1]
-        hidden_dim = 128
-        output_dim = y.shape[1]
-
-        if model is None:
-            print(
-                f'Initializing model with Input dim: {input_dim}, Hidden dim: {hidden_dim}, Output dim: {output_dim}')
-            model = KeywordExtractionModel(input_dim, hidden_dim, output_dim)
-            optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-        print('Training model...')
-        train_model(model, train_loader, criterion,
-                    optimizer, num_epochs=EPOCHS, device=device)
-        print(f'Finished training chunk {i + 1}/{total_chunks}')
+    print('Training model...')
+    input_dim = X.shape[1]
+    output_dim = y.shape[1]
+    model = train_model(X, y, input_dim, output_dim)
 
     print('Saving final model...')
-    torch.save(model.state_dict(), model_file)
+    model.save(model_file)
+    joblib.dump(vectorizer, 'vectorizer.pkl')
+    joblib.dump(mlb, 'mlb.pkl')
     print(f'Final model saved to {model_file}')
-    print(
-        f'Training completed!, Time taken: {time.perf_counter() - start:.2f} seconds')
 
-    # Now we can use the trained model for validate and test
     print('Validating and testing the model...')
     valid_data = pd.read_csv(valid_file)
     test_data = pd.read_csv(test_file)
 
-    # Preprocess validation and test data
     X_valid, y_valid, _, _ = preprocess_data(valid_data, vectorizer, mlb)
     X_test, y_test, _, _ = preprocess_data(test_data, vectorizer, mlb)
 
-    valid_dataset = TextDataset(X_valid, y_valid)
-    test_dataset = TextDataset(X_test, y_test)
+    valid_accuracy = evaluate_model(model, X_valid, y_valid)
+    test_accuracy = evaluate_model(model, X_test, y_test)
 
-    valid_loader = DataLoader(
-        valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    test_loader = DataLoader(
-        test_dataset, batch_size=BATCH_SIZE, shuffle=False)
-
-    # Evaluate the model on validation and test data
-    model.eval()
-
-    valid_predictions = make_predictions(model, valid_loader, device)
-    test_predictions = make_predictions(model, test_loader, device)
-
-    # save the predictions for later use
-    print('Saving predictions for later use...')
-    valid_predictions_file = 'valid_predictions.pkl'
-    test_predictions_file = 'test_predictions.pkl'
-    joblib.dump(valid_predictions, valid_predictions_file)
-    joblib.dump(test_predictions, test_predictions_file)
-
-    print('Calculating accuracy...')
-    valid_accuracy = find_accuracy(model, valid_loader, device)
-    test_accuracy = find_accuracy(model, test_loader, device)
-
-    print(
-        f'Validation accuracy: {valid_accuracy:.2f} ~ {valid_accuracy * 100:.2f}%')
-    print(f'Test accuracy: {test_accuracy:.2f} ~ {test_accuracy * 100:.2f}%')
-
-
-def make_predictions(model, data_loader, device=torch.device('cpu')):
-    predictions = []
-    with torch.no_grad():
-        for data in data_loader:
-            # Assuming data_loader returns a tuple (inputs, labels)
-            inputs, _ = data
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs, 1)
-            predictions.extend(predicted.cpu().numpy())
-    return predictions
-
-
-def find_accuracy(model, data_loader, device=torch.device('cpu')):
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for data in data_loader:
-            # Assuming data_loader returns a tuple (inputs, labels)
-            inputs, labels = data
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-    return correct / total
-
+    print(f'Validation accuracy: {valid_accuracy:.2f}')
+    print(f'Test accuracy: {test_accuracy:.2f}')
+    print(f'Training completed!, Time taken: {time.perf_counter() - start:.2f} seconds')
 
 if __name__ == '__main__':
+    physical_devices = tf.config.list_physical_devices('GPU')
+    if physical_devices:
+        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    else:
+        print("No GPU devices found. Training will proceed on CPU.")
     start_training()
