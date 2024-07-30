@@ -3,17 +3,21 @@ from rich import print
 import requests
 import time
 
+'''
+This file call SLM without fine-tuning. It uses the Ollama API to generate summaries.
+'''
+
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 '''
 This function takes a list of bullet points and generates a summary for each point using the Qwen2 model.
 '''
-def call_qwen(data: List[str], model="qwen2:0.5b-instruct-q8_0") -> List[str]:
+def call_model(data: List[str], model="qwen2:0.5b-instruct-q8_0") -> List[str]:
     start = time.perf_counter()
 
-    prompt = '''Summarize each of the following input into strictly 1 sentence each. Answer nothing but summarized answers.
+    prompt = '''Summarize each of the following input into strictly 1 sentence each. Answer nothing but summarized answers. Don't include this phrase too: "Here are the summarized answers:".
 
-    
+
         You output format:
         ```
         - <Summarized answer 1>
@@ -39,10 +43,8 @@ def call_qwen(data: List[str], model="qwen2:0.5b-instruct-q8_0") -> List[str]:
 
     
     # convert response back to list, each item start with '-'
-    print('Time taken:', time_taken)
-    print('Prompt:', prompt)
-    print('Response:', res)
-    return []
+    summarized_list = [item.strip() for item in res.split('\n-') if item.strip()]
+    return summarized_list
 
 
 # Example usage
@@ -56,6 +58,41 @@ data = [
 ]
 
 if __name__ == "__main__":
-    response = call_qwen(data)
-    print(f'Num items: {len(response)}')
-    print(response)
+    start = time.perf_counter()
+    # model = 'qwen2:0.5b-instruct-q8_0'
+    model = 'llama3.1:8b'
+    # response = call_model(data, model)
+
+    log_file = 'slm_log.txt'
+    calls = 100
+    with open(log_file, 'w') as f:
+        for i in range(calls):
+            response = call_model(data, model)
+            f.write(f'Iter {i+1}: {len(response)}\n')
+            print(f'Finished iteration {i+1}')
+    
+    print('Log written to', log_file)
+    print('Total time taken:', time.perf_counter() - start)
+    
+    # Now do analysis on the responses
+    
+    # split by : and get only 2nd part
+    # then convert that part to int
+    # if that part != 6, then that data acc is wrong
+    # else iti s true
+    
+    # now find total acc
+    # with open(log_file, 'r') as f:
+    #     lines = f.readlines()
+    #     acc = 0
+    #     for line in lines:
+    #         acc += int(line.split(':')[-1])
+        
+    #     print('Total accuracy:', acc / (calls * 6) * 100, '%')
+    #     print(f'Correct/Total: {acc}/{calls * 6}')
+    
+    #* BENCHMARK
+    '''
+    inp size = 6, acc = 99.83%, time = 230s
+    inp size = 30, acc = 20%, time = 838s
+    '''
