@@ -1,28 +1,20 @@
 from typing import List
-from cuml.feature_extraction.text import TfidfVectorizer
-from cuml.decomposition import TruncatedSVD
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
 from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
 import time
 import nltk
 import networkx as nx
-import cupy as cp
+import tensorflow as tf
 
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 
-'''
-This file contains a ML algorithm that extracts summaries from a given list of texts.
-The algorithm uses the extractive summarization technique to rank the sentences in the text
-and extract the most important sentences to form a summary.
-'''
-
-# Preprocess the text by tokenizing it into sentences
 def preprocess_text(text):
     sentences = sent_tokenize(text)
     return sentences
 
-# Build a similarity matrix based on the sentences
 def build_similarity_matrix(sentences):
     stop_words = list(set(stopwords.words('english')))
     vectorizer = TfidfVectorizer(stop_words=stop_words)
@@ -32,16 +24,16 @@ def build_similarity_matrix(sentences):
     svd = TruncatedSVD(n_components=n_components, random_state=42, n_iter=7)
     reduced_tfidf_matrix = svd.fit_transform(tfidf_matrix)
 
-    similarity_matrix = cp.dot(reduced_tfidf_matrix, reduced_tfidf_matrix.T)
-    return similarity_matrix.get()
+    # Convert to TensorFlow tensors
+    reduced_tfidf_matrix = tf.convert_to_tensor(reduced_tfidf_matrix, dtype=tf.float32)
+    similarity_matrix = tf.matmul(reduced_tfidf_matrix, reduced_tfidf_matrix, transpose_b=True)
+    return similarity_matrix.numpy()
 
-# Rank the sentences based on the similarity matrix
 def rank_sentences(similarity_matrix):
     nx_graph = nx.from_numpy_array(similarity_matrix)
     scores = nx.pagerank(nx_graph, max_iter=100, tol=1e-6)
     return scores
 
-# Extract the summary from the ranked sentences
 def extract_summary(sentences, scores, num_sentences=3):
     ranked_sentences = sorted(
         ((scores[i], s) for i, s in enumerate(sentences)), reverse=True)
@@ -49,7 +41,6 @@ def extract_summary(sentences, scores, num_sentences=3):
         sentence for _, sentence in ranked_sentences[:num_sentences])
     return summary
 
-# Process the text by preprocessing, building similarity matrix, ranking sentences, and extracting summary
 def process_text(text):
     sentences = preprocess_text(text)
     similarity_matrix = build_similarity_matrix(sentences)
@@ -57,16 +48,9 @@ def process_text(text):
     summary = extract_summary(sentences, scores)
     return summary
 
-'''
-Mass extract summaries from a list of texts and write the summaries to a list of summaries.
-'''
 def mass_extract_summaries(inputs: List[str]) -> List[str]:
     return [process_text(text) for text in inputs]
 
-'''
-This function is used to run the extractive summarization algorithm on different number of rows,
-to find relationship between the number of rows and the time taken to process them.
-'''
 def compare() -> None:
     print('Starting reading input')
     start_time = time.perf_counter()
