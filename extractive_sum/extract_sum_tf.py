@@ -5,15 +5,21 @@ from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
 import time
 import nltk
-import networkx as nx
 import tensorflow as tf
 
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 
+'''
+This file contains a ML algorithm that extracts summaries from a given list of texts.
+We run the algorithm on GPU and compare the time taken to process different number of rows.
+'''
+
+
 def preprocess_text(text):
     sentences = sent_tokenize(text)
     return sentences
+
 
 def build_similarity_matrix(sentences):
     stop_words = list(set(stopwords.words('english')))
@@ -25,14 +31,33 @@ def build_similarity_matrix(sentences):
     reduced_tfidf_matrix = svd.fit_transform(tfidf_matrix)
 
     # Convert to TensorFlow tensors
-    reduced_tfidf_matrix = tf.convert_to_tensor(reduced_tfidf_matrix, dtype=tf.float32)
-    similarity_matrix = tf.matmul(reduced_tfidf_matrix, reduced_tfidf_matrix, transpose_b=True)
-    return similarity_matrix.numpy()
+    reduced_tfidf_matrix = tf.convert_to_tensor(
+        reduced_tfidf_matrix, dtype=tf.float32)
+    similarity_matrix = tf.matmul(
+        reduced_tfidf_matrix, reduced_tfidf_matrix, transpose_b=True)
+    return similarity_matrix
 
-def rank_sentences(similarity_matrix):
-    nx_graph = nx.from_numpy_array(similarity_matrix)
-    scores = nx.pagerank(nx_graph, max_iter=100, tol=1e-6)
-    return scores
+
+def rank_sentences(similarity_matrix, damping_factor=0.85, max_iter=100, tol=1e-6):
+    N = similarity_matrix.shape[0]
+    similarity_matrix = tf.convert_to_tensor(
+        similarity_matrix, dtype=tf.float32)
+
+    # Initialize the PageRank vector
+    pagerank = tf.ones([N, 1], dtype=tf.float32) / N
+
+    # Create the teleportation matrix
+    teleport = tf.ones([N, N], dtype=tf.float32) / N
+
+    for i in range(max_iter):
+        new_pagerank = (1 - damping_factor) / N + damping_factor * \
+            tf.matmul(similarity_matrix, pagerank)
+        if tf.reduce_sum(tf.abs(new_pagerank - pagerank)) < tol:
+            break
+        pagerank = new_pagerank
+
+    return {i: pagerank[i, 0].numpy() for i in range(N)}
+
 
 def extract_summary(sentences, scores, num_sentences=3):
     ranked_sentences = sorted(
@@ -41,6 +66,7 @@ def extract_summary(sentences, scores, num_sentences=3):
         sentence for _, sentence in ranked_sentences[:num_sentences])
     return summary
 
+
 def process_text(text):
     sentences = preprocess_text(text)
     similarity_matrix = build_similarity_matrix(sentences)
@@ -48,8 +74,10 @@ def process_text(text):
     summary = extract_summary(sentences, scores)
     return summary
 
+
 def mass_extract_summaries(inputs: List[str]) -> List[str]:
     return [process_text(text) for text in inputs]
+
 
 def compare() -> None:
     print('Starting reading input')
@@ -77,6 +105,7 @@ def compare() -> None:
             print(f'Completed {n} rows in {elapsed_time:.2f} seconds')
 
     print('All done!')
+
 
 if __name__ == '__main__':
     compare()

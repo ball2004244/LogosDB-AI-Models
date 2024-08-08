@@ -7,7 +7,7 @@ This code to visualize the relationship between the number of rows and the time 
 
 # Read data from the file
 time_file = 'time_vs_rows.txt'
-plot_file = 'plot.png'
+plot_file = 'gpu-plot-v1.png'
 data = []
 with open(time_file, 'r') as file:
     for line in file:
@@ -24,7 +24,7 @@ print(f'Quadratic coefficients: a={a}, b={b}, c={c}')
 print(f'Fitted quadratic equation: y = {a:.8f}x^2 + {b:.8f}x + {c:.8f}')
 
 # Save the coefficients to a file
-coeff_file = 'quadratic_coefficients.txt'
+coeff_file = 'gpu-coef-v1.txt'
 with open(coeff_file, 'w') as file:
     file.write(f'{a} {b} {c}\n')
 
