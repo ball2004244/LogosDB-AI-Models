@@ -70,6 +70,8 @@ def process_text(text):
 
 '''
 Mass extract summaries from a list of texts and write the summaries to a list of summaries.
+Input: List of raw texts
+Output: List of summarized texts
 '''
 
 
