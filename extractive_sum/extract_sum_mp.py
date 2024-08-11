@@ -57,6 +57,7 @@ def process_text(text):
     return summary
 
 def mass_extract_summaries(inputs: List[str]) -> List[str]:
+    print(f'Start summarize on multiprocessing mode with {mp.cpu_count()} cores') 
     with mp.Pool() as pool:
         summaries = pool.map(process_text, inputs)
     return summaries
@@ -73,7 +74,7 @@ def compare() -> None:
     num_data = [25000, 50000, 75000, 100000, 125000]
     time_file = 'time_vs_rows_mp.txt'
 
-    print('Running extractive summarization on different number of rows (Multiprocessing mode)')
+    print('Running extractive summarization on different number of rows')
     print(f'All rows to be processed: {num_data}')
     with open(time_file, 'w') as time_file:
         for n in num_data:
