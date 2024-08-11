@@ -65,13 +65,13 @@ def mass_extract_summaries(inputs: List[str]) -> List[str]:
 def compare() -> None:
     store_mp_config()
     print('Starting reading input')
-    input_file = 'summary_input.txt'
+    input_file = 'data/inp_2M.txt'
     output_file = 'summary_output.txt'
 
     with open(input_file, 'r') as file:
         user_inputs = file.readlines()
 
-    num_data = [25000, 50000, 75000, 100000, 125000]
+    num_data = [200000, 500000, 1000000, 2000000]
     time_file = 'time_vs_rows_mp.txt'
 
     print('Running extractive summarization on different number of rows')

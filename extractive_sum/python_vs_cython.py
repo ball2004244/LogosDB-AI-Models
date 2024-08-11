@@ -14,7 +14,7 @@ MP_CONFIG_FILE = 'mp_config.txt'
 SINGLE_COEF_FILE = 'cpu-coef.txt'
 MULTI_COEF_FILE = 'cpu-coef-mp.txt'
 CYTHON_COEF_FILE = 'cpu-coef-cython.txt'
-PLOT_FILE = 'single_vs_multi_vs_cython.png'
+PLOT_FILE = 'multi_vs_cython.png'
 
 def read_data(file_path):
     """Read data from a file and return it as a list of tuples."""
@@ -51,20 +51,18 @@ def store_coefficients(file_path, coefficients):
 def plot_data(single_rows, single_times, single_fit, multi_rows, multi_times, multi_fit, cython_rows, cython_times, cython_fit, config):
     """Plot the actual times and fitted polynomial for single-processing, multi-processing, and Cython."""
     plt.figure(figsize=(10, 6))
-    plt.plot(single_rows, single_times, marker='o', linestyle='-', color='b', label='Single-processing Actual')
-    plt.plot(single_rows, single_fit, linestyle='--', color='c', label='Single-processing Fit')
+    # plt.plot(single_rows, single_times, marker='o', linestyle='-', color='b', label='Single-processing Actual')
+    # plt.plot(single_rows, single_fit, linestyle='--', color='c', label='Single-processing Fit')
     plt.plot(multi_rows, multi_times, marker='o', linestyle='-', color='g', label='Multi-processing Actual')
     plt.plot(multi_rows, multi_fit, linestyle='--', color='y', label='Multi-processing Fit')
     plt.plot(cython_rows, cython_times, marker='o', linestyle='-', color='r', label='Cython Actual')
     plt.plot(cython_rows, cython_fit, linestyle='--', color='m', label='Cython Fit')
     plt.xlabel('Number of Rows')
     plt.ylabel('Time (s)')
-    plt.title('Time vs Number of Rows (Single vs Multi vs Cython)')
+    plt.title('Time vs Number of Rows (32 cores vs Cython)')
     plt.grid(True)
 
     # Add text annotations for each point
-    for row, time in zip(single_rows, single_times):
-        plt.annotate(f'({row}, {time:.2f})', (row, time), textcoords="offset points", xytext=(0, 10), ha='center')
     for row, time in zip(multi_rows, multi_times):
         plt.annotate(f'({row}, {time:.2f})', (row, time), textcoords="offset points", xytext=(0, 10), ha='center')
     for row, time in zip(cython_rows, cython_times):
