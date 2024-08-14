@@ -12,6 +12,7 @@ from libc.stdlib cimport malloc, free
 
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 
 cpdef list preprocess_text(str text):
     cdef list sentences = sent_tokenize(text)
@@ -22,18 +23,25 @@ cpdef cnp.ndarray build_similarity_matrix(list sentences):
     vectorizer = TfidfVectorizer(stop_words=stop_words)
     tfidf_matrix = vectorizer.fit_transform(sentences).toarray()
 
-    if tfidf_matrix.shape[1] == 0:
-        raise ValueError("TF-IDF matrix has zero columns. Check the input data.")
+    # Let this be None for now
+    if tfidf_matrix.shape[1] < 2:
+        # print(f"TF-IDF matrix shape: {tfidf_matrix.shape}")
+        # raise ValueError("TF-IDF matrix has less than 2 columns. Check the input data.")
+        return None
 
-    cdef int n_components = min(100, tfidf_matrix.shape[1])
-    svd = TruncatedSVD(n_components=n_components, random_state=42, n_iter=7)
-    reduced_tfidf_matrix = svd.fit_transform(tfidf_matrix)
+    # print(f"TF-IDF matrix shape: {tfidf_matrix.shape}")
+    cdef int n_components = min(tfidf_matrix.shape[1] - 1, 100)  # Subtract 1 from tfidf_matrix.shape[1]
+    # print(f"n_components: {n_components}")
+    with np.errstate(divide='ignore', invalid='ignore'):
+        svd = TruncatedSVD(n_components=n_components, random_state=42, n_iter=7)
+        reduced_tfidf_matrix = svd.fit_transform(tfidf_matrix)
 
-    if np.isnan(reduced_tfidf_matrix).any():
-        raise ValueError("NaN values encountered in reduced TF-IDF matrix.")
+    # print(f"Reduced TF-IDF matrix shape: {reduced_tfidf_matrix.shape}")
 
+    # Calculate similarity matrix directly from the reduced TF-IDF matrix
     cdef cnp.ndarray[cnp.float64_t, ndim=2] similarity_matrix = np.dot(reduced_tfidf_matrix, reduced_tfidf_matrix.T)
     return similarity_matrix
+
 
 cpdef dict rank_sentences(cnp.ndarray similarity_matrix):
     nx_graph = nx.from_numpy_array(similarity_matrix)
@@ -53,6 +61,9 @@ cpdef str extract_summary(list sentences, dict scores, int num_sentences=3):
 cpdef str process_text(str text):
     cdef list sentences = preprocess_text(text)
     cdef cnp.ndarray similarity_matrix = build_similarity_matrix(sentences)
+
+    if similarity_matrix is None:
+        return ''
     cdef dict scores = rank_sentences(similarity_matrix)
     cdef str summary = extract_summary(sentences, scores)
     return summary
