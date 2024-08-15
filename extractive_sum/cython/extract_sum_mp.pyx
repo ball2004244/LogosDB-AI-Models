@@ -32,7 +32,7 @@ cpdef list preprocess_text(str text):
 
 cpdef cnp.ndarray build_similarity_matrix(list sentences):
     cdef list stop_words = list(set(stopwords.words('english')))
-    vectorizer = TfidfVectorizer(stop_words=stop_words, min_df=2)
+    vectorizer = TfidfVectorizer(stop_words=stop_words)
     tfidf_matrix = vectorizer.fit_transform(sentences).toarray()
 
     # Let this be None for now
