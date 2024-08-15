@@ -7,6 +7,8 @@ import time
 '''
 This class provides a simple text summarization functionality using the KeyBERT library.
 It returns the top keywords and sentences based on the weighted presence of keywords (which is a brief summary).
+
+pip install keybert
 '''
 
 class TextSummarizer:
