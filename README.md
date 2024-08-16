@@ -7,14 +7,16 @@ This repository contains the code for the AI models used in the LogosDB project.
 
 ## Installation
 1. Clone the repository
-2. Install the required packages
+2. Install the required packages (Different methods have different requirements, see below)
+2.1 Keyword Summary:
 ```bash
-pip install -r requirements.txt
+pip install keybert
 ```
 
+2.2 Extractive Summary:
 For extractive summary requirements, install the following:
 ```bash
-pip install cython
+pip install cython nltk networkx numpy scikit-learn
 ```
 
 Compile the cython code:
