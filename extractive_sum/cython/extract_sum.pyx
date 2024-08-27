@@ -8,7 +8,6 @@ from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
 import nltk
 import networkx as nx
-import multiprocessing as mp
 import numpy as np
 
 cimport numpy as cnp
@@ -17,8 +16,6 @@ from libc.stdlib cimport malloc, free
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt_tab', quiet=True)
-
-# A multi-processing version of the extractive summarization algorithm.
 
 def count_words(text):
     return len(text.split())
@@ -98,7 +95,7 @@ cpdef str process_text(str text):
     return summary
 
 cpdef list mass_extract_summaries(list inputs):
-    print(f'Start summarize on multiprocessing mode with {mp.cpu_count()} cores')
+    print('Start summarizing without multiprocessing')
     summaries = []
     for input_text in inputs:
         # print(f"Processing input: {input_text[:100]}...")  # Print the first 100 characters of the input for debugging
