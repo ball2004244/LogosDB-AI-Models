@@ -34,7 +34,12 @@ def measure_raw(df: pd.DataFrame) -> None:
             correct += 1
         else:
             wrong += 1
-    print(f'Correct: {correct}, Wrong: {wrong}, Accuracy: {correct/len(df)}')
-
+            
+    # save the result to a file
+    result_file = 'llama_raw_stats.txt'
+    result_path = os.path.join(res_dir, result_file)
+    with open(result_path, 'w') as f:
+        f.write(f'Correct: {correct}, Wrong: {wrong}, Accuracy: {correct/len(df)}')
+    print(f'Save result to {result_path}')
 if __name__ == '__main__':
     measure_raw(df)
