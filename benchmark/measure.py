@@ -5,7 +5,8 @@ import os
 from datasets import load_dataset
 import pandas as pd
 
-ds = load_dataset("cais/mmlu", "college_computer_science")
+subject = 'business_ethics'
+ds = load_dataset("cais/mmlu", subject)
 df = pd.DataFrame(ds['test'])
 
 ANSWER_MAP = {
@@ -28,9 +29,12 @@ def measure_raw(df: pd.DataFrame) -> None:
     wrong = 0
     for i, row in df.iterrows():
         print(f'Processing row {i}/{len(df)}...')
-        raw_answer = res[i-1].strip()
+        raw_answer = res[i-1].strip()[0].upper() # also take only the first character
         answer = row['answer']
-        if ANSWER_MAP[raw_answer] == answer:
+        
+        if raw_answer not in ANSWER_MAP:
+            wrong += 1
+        elif ANSWER_MAP[raw_answer] == answer:
             correct += 1
         else:
             wrong += 1
