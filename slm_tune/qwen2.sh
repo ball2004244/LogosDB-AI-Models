@@ -3,7 +3,7 @@
 
 # pull qwen2:0.5b
 curl http://localhost:11434/api/pull -d '{
-  "name": "qwen2:0.5b-instruct-q8_0"
+  "name": "llama3.1:8b"
 }'
 
 # run inference

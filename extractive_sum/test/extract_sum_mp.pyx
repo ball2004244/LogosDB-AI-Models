@@ -18,8 +18,6 @@ nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt_tab', quiet=True)
 
-# A multi-processing version of the extractive summarization algorithm.
-
 def count_words(text):
     return len(text.split())
 
@@ -67,12 +65,14 @@ cpdef str extract_summary(list sentences, dict scores, int num_sentences=3):
     return summary.strip()
 
 cpdef str process_text(str text):
+    # print(f"Processing text: {text[:100]}...")  # Print the first 100 characters of the text for debugging
     cdef list sentences = preprocess_text(text)
     if not sentences:
         print("No sentences found after preprocessing.")
         return ''
     
     cdef int word_count = count_words(text)
+    # print(f"Word count: {word_count}")  # Debugging word count
     filtered_sentences = []
     for sentence in sentences:
         if word_count < 100:
@@ -84,13 +84,15 @@ cpdef str process_text(str text):
         print("No filtered sentences found.")
         return ''
 
+    # print(f"Filtered sentences: {filtered_sentences[:3]}...")  # Print the first 3 filtered sentences for debugging
     cdef cnp.ndarray similarity_matrix = build_similarity_matrix(filtered_sentences)
 
     if similarity_matrix is None:
         print("Similarity matrix is None.")
         return ''
     cdef dict scores = rank_sentences(similarity_matrix)
-    cdef str summary = extract_summary(filtered_sentences, scores, num_sentences=3)  # Ensure top 3 sentences are returned
+    cdef str summary = extract_summary(filtered_sentences, scores)
+    # print(f"Generated summary: {summary[:100]}...")  # Print the first 100 characters of the summary for debugging
     return summary
 
 cpdef list mass_extract_summaries(list inputs):

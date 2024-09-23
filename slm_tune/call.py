@@ -46,6 +46,17 @@ def call_model(data: List[str], model="qwen2:0.5b-instruct-q8_0") -> List[str]:
     summarized_list = [item.strip() for item in res.split('\n-') if item.strip()]
     return summarized_list
 
+def raw_call(prompt: str, model="qwen2:0.5b-instruct-q8_0") -> str:
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False
+    }
+
+    response = requests.post(OLLAMA_URL, json=payload)
+    res = response.json()['response']
+
+    return res
 
 # Example usage
 data = [
