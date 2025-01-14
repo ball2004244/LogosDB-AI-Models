@@ -3,7 +3,7 @@ This repository contains the code for the AI models used in the LogosDB project.
 
 1. Extractive Summary: extract portions of sentences that have the highest importance in the text using Tf-idf and TextRank algorithms.
 
-2. Abstractive Summary: finetune Google T5 model on Reddit TIFU & Wikipedia Summary Dataset.
+2. Abstractive Summary: finetune Google T5 model on CNN/DailyMail Dataset.
 
 ## Installation
 1. Clone the repository
@@ -30,3 +30,8 @@ To use compiled Cython code, import the compiled module to your C++ code:
 #include "extractive_sum/cython/summarizer.h"
 ```
 
+2.3 Abstractive Summary:
+Install requirements:
+```bash
+pip install transformers torch peft datasets pandas
+```
